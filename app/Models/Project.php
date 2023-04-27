@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,8 +39,28 @@ class Project extends Model
         return $this->belongsTo(User::class);
     }
 
+    // Este metodo es para aplicar los filtros de busqueda
+    // Este metodo se usa con el modelo como si fuera otro metodo del query builder Project::filter();
+    // Este metodo se aplicara solo cuando se use el metodo filter en el queryBuilder
     public function scopeFilter( Builder $query, array $filters)
     {
-        // TODO filtrar listado del cliente con vuejs
+        // Si no es una peticion de paginacion, entonces actualizamos los filtros en la sesion
+        if(!request("page")){
+            session()->put("search", $filters["search"] ?? null);
+            session()->put("trashed", $filters["trashed"] ?? null);
+        }
+
+        // Cuando la busqueda "search" no esta vacia, entonces aplicamos el filtro
+        $query->when(session("search"), function ($query, $search){
+            $query->where('name', 'LIKE', '%'.$search.'%')
+                ->orWhere('excerpt', 'LIKE', '%'.$search.'%')
+                ->orWhere('content', 'LIKE', '%'.$search.'%');
+        })->when(session("trashed"), function ($query, $trashed){
+            if($trashed === "with"){
+                $query->withTrashed(); // proyectos incluso eliminados mediante soft delete
+            }elseif ($trashed === "only"){
+                $query->onlyTrashed(); // solo proyectos eliminados mediante soft delete
+            }
+        });
     }
 }
